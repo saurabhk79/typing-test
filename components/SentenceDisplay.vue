@@ -12,7 +12,6 @@
       @blur="isFocused = false"
       @focus="isFocused = true"
       class="absolute inset-0 opacity-0 z-0 cursor-text resize-none"
-      :disabled="!isRunning && internalTypedText.length > 0"
       aria-label="Typing input"
       autocapitalize="off"
       autocomplete="off"
@@ -20,12 +19,20 @@
       spellcheck="false"
     ></textarea>
 
-    <span v-for="(char, index) in sentence" :key="index"
+    <span
+      v-for="(char, index) in sentence"
+      :key="index"
       :class="{
         'text-red-500': errors[index],
-        'text-green-600': internalTypedText[index] === char && !errors[index] && internalTypedText.length > index,
+        'text-green-600':
+          internalTypedText[index] === char &&
+          !errors[index] &&
+          internalTypedText.length > index,
         'text-gray-400': internalTypedText.length <= index && !errors[index],
-        'text-gray-900 dark:text-gray-100': internalTypedText.length > index && !errors[index] && internalTypedText[index] !== char
+        'text-gray-900 dark:text-gray-100':
+          internalTypedText.length > index &&
+          !errors[index] &&
+          internalTypedText[index] !== char,
       }"
       class="relative inline-block transition-colors duration-100"
     >
@@ -45,7 +52,7 @@
 </template>
 
 <script setup>
-import { ref, watch, defineProps, defineEmits, nextTick, computed } from 'vue';
+import { ref, watch, defineProps, defineEmits, nextTick, computed } from "vue";
 
 const props = defineProps({
   sentence: {
@@ -63,10 +70,10 @@ const props = defineProps({
   isRunning: {
     type: Boolean,
     required: true,
-  }
+  },
 });
 
-const emit = defineEmits(['update:typedText', 'start', 'update:errors']);
+const emit = defineEmits(["update:typedText", "start", "update:errors"]);
 
 const hiddenInputRef = ref(null);
 const isFocused = ref(false);
@@ -74,8 +81,8 @@ const isFocused = ref(false);
 const internalTypedText = computed({
   get: () => props.typedText,
   set: (value) => {
-    emit('update:typedText', value);
-  }
+    emit("update:typedText", value);
+  },
 });
 
 const focusInput = () => {
@@ -86,7 +93,7 @@ const handleInput = (event) => {
   const newText = event.target.value;
 
   if (newText.length > 0 && !props.isRunning) {
-    emit('start');
+    emit("start");
   }
 
   if (newText.length <= props.sentence.length) {
@@ -98,63 +105,98 @@ const handleInput = (event) => {
 };
 
 const handleKeyDown = (event) => {
-  if (event.key.length > 1 && !event.key.includes('Arrow') && event.key !== 'Backspace' && event.key !== 'Delete' && event.key !== 'Enter' && event.key !== 'Tab') {
+  if (event.key === "Backspace") {
+    event.preventDefault();
     return;
   }
 
-  if (event.key === ' ') {
-    const currentTypedChar = internalTypedText.value[internalTypedText.value.length - 1];
+  if (
+    event.key.length > 1 &&
+    ![
+      "Delete",
+      "Enter",
+      "Tab",
+      "ArrowLeft",
+      "ArrowRight",
+      "ArrowUp",
+      "ArrowDown",
+      "Home",
+      "End",
+    ].includes(event.key)
+  ) {
+    return;
+  }
+
+  if (!props.isRunning) {
+    if (internalTypedText.value.length === 0) {
+      return;
+    } else {
+      event.preventDefault();
+      return;
+    }
+  }
+
+  if (event.key === " ") {
+    const currentTypedChar =
+      internalTypedText.value[internalTypedText.value.length - 1];
     const currentSentenceChar = props.sentence[internalTypedText.value.length];
 
-    if (internalTypedText.value.length === props.sentence.length && internalTypedText.value === props.sentence) {
-      event.preventDefault();
-    } else if (currentTypedChar === ' ' && event.key === ' ') {
-      event.preventDefault();
-    } else if (event.key === ' ' && currentSentenceChar !== ' ' && internalTypedText.value.length < props.sentence.length) {
-      event.preventDefault();
-    }
-  }
-
-  if (internalTypedText.value.length === props.sentence.length && internalTypedText.value === props.sentence) {
-    if (event.key !== 'Backspace' && event.key !== 'Delete' && event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
+    if (
+      currentTypedChar === " " ||
+      (currentSentenceChar !== " " &&
+        internalTypedText.value.length < props.sentence.length)
+    ) {
       event.preventDefault();
     }
   }
 
-  if (!props.isRunning && internalTypedText.value.length > 0) {
-    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'Tab'].includes(event.key) &&
-        !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && event.key.length === 1) {
+  if (
+    internalTypedText.value.length === props.sentence.length &&
+    internalTypedText.value === props.sentence
+  ) {
+    if (
+      event.key !== "Delete" &&
+      event.key !== "ArrowLeft" &&
+      event.key !== "ArrowRight"
+    ) {
       event.preventDefault();
     }
   }
-
-  nextTick(() => {
-    hiddenInputRef.value?.focus();
-  });
 };
 
 const updateErrorHighlighting = (currentTypedText) => {
   const newErrors = [];
   for (let i = 0; i < props.sentence.length; i++) {
-    if (i < currentTypedText.length && currentTypedText[i] !== props.sentence[i]) {
+    if (
+      i < currentTypedText.length &&
+      currentTypedText[i] !== props.sentence[i]
+    ) {
       newErrors[i] = true;
     } else {
       newErrors[i] = false;
     }
   }
-  emit('update:errors', newErrors);
+  emit("update:errors", newErrors);
 };
 
-watch(() => props.typedText, (newVal) => {
-  if (newVal === '') {
-    nextTick(() => {
-      hiddenInputRef.value?.focus();
-    });
-    updateErrorHighlighting('');
-  } else if (newVal.length > 0 && newVal.length === props.sentence.length && newVal === props.sentence) {
-    hiddenInputRef.value?.blur();
-  }
-}, { immediate: true });
+watch(
+  () => props.typedText,
+  (newVal) => {
+    if (newVal === "") {
+      nextTick(() => {
+        hiddenInputRef.value?.focus();
+      });
+      updateErrorHighlighting("");
+    } else if (
+      newVal.length > 0 &&
+      newVal.length === props.sentence.length &&
+      newVal === props.sentence
+    ) {
+      hiddenInputRef.value?.blur();
+    }
+  },
+  { immediate: true }
+);
 
 onMounted(() => {
   hiddenInputRef.value?.focus();
@@ -163,8 +205,13 @@ onMounted(() => {
 
 <style scoped>
 @keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
 }
 
 .animate-blink {
@@ -177,5 +224,9 @@ onMounted(() => {
   width: 100%;
   height: 100%;
   caret-color: transparent;
+}
+
+.sentence-display {
+  white-space: pre-wrap;
 }
 </style>
